@@ -1,4 +1,4 @@
-,Gender,Elderly,BMI,Smoking,Binge,Chronic Lung,Heart Attack,Chronic Kidney,stroke,cancer,dm,Psycho Disorder,Andrographis Used,Andrographis Type,Andrographis Day,Vaccine Take,VacNameTotal,Snot,Cough,SoreThroat,NoSmell,NotTaste,Headache,MuscleAches,JointAches,Tired,Rash,Asthma,Dyspnea,Angina,Palpitations,Anorexia,Flatulence,Vertigo,Insomnia,Anxiety,HairLoss,symptoms
+no,Gender,Elderly,BMI,Smoking,Binge,Chronic Lung,Heart Attack,Chronic Kidney,stroke,cancer,dm,Psycho Disorder,Andrographis Used,Andrographis Type,Andrographis Day,Vaccine Take,VacNameTotal,Snot,Cough,SoreThroat,NoSmell,NotTaste,Headache,MuscleAches,JointAches,Tired,Rash,Asthma,Dyspnea,Angina,Palpitations,Anorexia,Flatulence,Vertigo,Insomnia,Anxiety,HairLoss,symptoms
 0,F,yes,15.82,no,no,yes,no,no,no,no,no,no,yes,powder,1.0,yes,4.0,no,no,no,no,no,no,no,no,no,no,no,no,no,no,yes,yes,no,no,no,no,yes
 1,M,yes,28.72,no,no,no,no,no,no,no,yes,no,yes,powder,5.0,yes,4.0,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no,no
 2,F,yes,29.14,no,no,no,yes,no,no,no,no,no,yes,powder,5.0,yes,3.0,yes,yes,yes,no,no,no,no,no,no,no,no,no,no,no,yes,yes,no,yes,yes,no,yes
