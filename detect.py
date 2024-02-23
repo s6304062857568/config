@@ -14,6 +14,8 @@ from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
 from numpy import random
+from google.colab.patches import cv2_imshow
+from IPython.display import display
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # yolov5 strongsort root directory
@@ -27,6 +29,7 @@ if str(ROOT / 'strong_sort') not in sys.path:
     sys.path.append(str(ROOT / 'strong_sort'))  # add strong_sort ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
+
 from yolov7.models.experimental import attempt_load
 from yolov7.utils.datasets import LoadImages, LoadStreams
 from yolov7.utils.general import (check_img_size, non_max_suppression, scale_coords, check_requirements, cv2,
@@ -38,7 +41,6 @@ from strong_sort.strong_sort import StrongSORT
 
 import cv2
 import numpy as np
-from google.colab.patches import cv2_imshow
 
 VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
 
@@ -290,28 +292,45 @@ def run(
         strip_optimizer(yolo_weights)  # update model (to fix SourceChangeWarning)
 
     # Resize each frame
-    print('\n',result_list)
-    print(type(all_frames[0]))
+    resized_frames = []
+    fi = 1
+    for f in result_list:
+      bbox_left, bbox_top, bbox_w, bbox_h = int(f[2]), int(f[3]), int(f[4]), int(f[5])
+
+      croped_frame = crop_frame(all_frames[f[0]-1], bbox_left, bbox_top, bbox_w, bbox_h)
+      # #print(croped_frame.shape) # y, x, color (สูง กว้าง สี)
+
+      resized_frame = resize_image_maintain_aspect_ratio(croped_frame)
+      resized_frames.append(resized_frame)
+      cv2.imwrite(f"/content/img/frame_{fi}.jpg", resized_frame)
+      fi += 1
 
     return result_list
 
 def read_video_frames(video_path):
-    # Open the video file
+    # เปิดวิดีโอ
     cap = cv2.VideoCapture(video_path)
 
+    # ตรวจสอบว่าวิดีโอถูกเปิดหรือไม่
+    if not cap.isOpened():
+        print("Error: ไม่สามารถเปิดวิดีโอได้", video_path)
+        return None
+
+    # เก็บเฟรมของวิดีโอ
     frames = []
-    while cap.isOpened():
-        # Read a frame from the video
+
+    # อ่านเฟรมทีละเฟรม
+    while True:
         ret, frame = cap.read()
 
-        # Check if the frame was successfully read
-        if ret:
-            # Append the frame to the list
-            frames.append(frame)
-        else:
+        # หากไม่มีเฟรมที่อ่านได้แล้ว (จบวิดีโอ)
+        if not ret:
             break
 
-    # Release the video capture object
+        # เพิ่มเฟรมลงในรายการ
+        frames.append(frame)
+
+    # ปิดวิดีโอ
     cap.release()
 
     return frames
@@ -387,6 +406,10 @@ def detect(vid_path):
   opt = parse_opt()
   opt.source = vid_path
   return run(**vars(opt))
+
+def test():
+    opt = parse_opt()
+    print(opt)
 
 def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
