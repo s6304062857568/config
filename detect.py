@@ -15,7 +15,6 @@ import torch
 import torch.backends.cudnn as cudnn
 from numpy import random
 
-
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # yolov5 strongsort root directory
 WEIGHTS = ROOT / 'weights'
@@ -28,16 +27,18 @@ if str(ROOT / 'strong_sort') not in sys.path:
     sys.path.append(str(ROOT / 'strong_sort'))  # add strong_sort ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-
 from yolov7.models.experimental import attempt_load
 from yolov7.utils.datasets import LoadImages, LoadStreams
 from yolov7.utils.general import (check_img_size, non_max_suppression, scale_coords, check_requirements, cv2,
                                   check_imshow, xyxy2xywh, increment_path, strip_optimizer, colorstr, check_file)
 from yolov7.utils.torch_utils import select_device, time_synchronized
-from yolov7.utils.plots import plot_one_box, save_one_box
+#from yolov7.utils.plots import plot_one_box, save_one_box
 from strong_sort.utils.parser import get_config
 from strong_sort.strong_sort import StrongSORT
 
+import cv2
+import numpy as np
+from google.colab.patches import cv2_imshow
 
 VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
 
@@ -76,6 +77,7 @@ def run(
 ):
 
     result_list = []
+    all_frames = read_video_frames(str(source))
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (VID_FORMATS)
@@ -105,6 +107,7 @@ def run(
     names, = model.names,
     stride = model.stride.max().cpu().numpy()  # model stride
     imgsz = check_img_size(imgsz[0], s=stride)  # check image size
+    
 
     # Dataloader
     if webcam:
@@ -148,6 +151,7 @@ def run(
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     for frame_idx, (path, im, im0s, vid_cap) in enumerate(dataset):
+        
         s = ''
         t1 = time_synchronized()
         im = torch.from_numpy(im).to(device)
@@ -242,10 +246,10 @@ def run(
                             id = int(id)  # integer id
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
                                 (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
-                            plot_one_box(bboxes, im0, label=label, color=colors[int(cls)], line_thickness=2)
+                            #plot_one_box(bboxes, im0, label=label, color=colors[int(cls)], line_thickness=2)
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                                save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                                #save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
 
                 print(f'{s}Done. YOLO:({t3 - t2:.3f}s), StrongSORT:({t5 - t4:.3f}s)')
 
@@ -284,7 +288,63 @@ def run(
         print(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(yolo_weights)  # update model (to fix SourceChangeWarning)
+
+    # Resize each frame
+    print('\n',result_list)
+    print(type(all_frames[0]))
+
     return result_list
+
+def read_video_frames(video_path):
+    # Open the video file
+    cap = cv2.VideoCapture(video_path)
+
+    frames = []
+    while cap.isOpened():
+        # Read a frame from the video
+        ret, frame = cap.read()
+
+        # Check if the frame was successfully read
+        if ret:
+            # Append the frame to the list
+            frames.append(frame)
+        else:
+            break
+
+    # Release the video capture object
+    cap.release()
+
+    return frames
+
+def crop_frame(frame, bbox_left, bbox_top, bbox_w, bbox_h):
+    cropped_frame = frame[bbox_top:bbox_top+bbox_h, bbox_left:bbox_left+bbox_w]
+    return cropped_frame
+
+def resize_image_maintain_aspect_ratio(image, target_size=224):
+    # ดึงขนาดปัจจุบันของรูปภาพ
+    height, width, _ = image.shape
+
+    # คำนวณอัตราส่วนของภาพที่คล้ายกัน
+    aspect_ratio = width / height
+
+    # ปรับขนาดรูปภาพให้มีความยาว (width) หรือความสูง (height) ตาม target_size
+    if aspect_ratio > 1:  # ถ้าภาพนั้นกว้างกว่าที่สูง
+        new_width = target_size
+        new_height = int(target_size / aspect_ratio)
+    else:  # ถ้าภาพนั้นสูงกว่าที่กว้าง
+        new_height = target_size
+        new_width = int(target_size * aspect_ratio)
+
+    # ปรับขนาดรูปภาพ
+    resized_image = cv2.resize(image, (new_width, new_height))
+
+    # สร้างรูปภาพที่มีขนาดตาม target_size และเติมสีดำ (padding)
+    padded_image = np.zeros((target_size, target_size, 3), dtype=np.uint8)
+    start_x = (target_size - new_width) // 2
+    start_y = (target_size - new_height) // 2
+    padded_image[start_y:start_y + new_height, start_x:start_x + new_width] = resized_image
+
+    return padded_image
 
 def parse_opt():
     parser = argparse.ArgumentParser()
