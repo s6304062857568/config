@@ -114,7 +114,7 @@ def run(
         'lr': 0.0001,
         'start_epoch': 2,
         'num_classes': 3,
-        'labels': {"0" : "block", "1" : "pass", "2" : "run", "3" : "dribble", "4" : "shoot", "5" : "ball in hand", "6" : "defense", "7" : "pick" , "8" : "no_action" , "9" : "walk" , "10" : "discard"},
+        'labels': {"0" : "pick", "1" : "stand", "2" : "walk"},
         'model_path': "model_checkpoints/r2plus1d_augmented-2/",
         'history_path': "histories/history_r2plus1d_augmented-2.txt",
         'seq_length': 16,
@@ -355,11 +355,11 @@ def run(
 
       if id not in result_dict or result_dict[id] is None:
         new_arr = []
-        new_arr.append(np.asarray(resized_frame))
+        new_arr.append(resized_frame)
         result_dict[id] = new_arr
       else:
         existing_arr = result_dict[id]
-        existing_arr.append(np.asarray(resized_frame))
+        existing_arr.append(resized_frame)
         result_dict[id] = existing_arr
 
     predictions = {}
@@ -368,6 +368,11 @@ def run(
       #frames = frames[0:16]
       frames = select_items_with_equal_spacing(frames, 16)
       print('frames len:', len(frames))
+      
+      frames = np.asarray(frames)
+      print(frames.shape)
+      frames = np.expand_dims(frames, axis=0)
+      print(frames.shape)
 
       input_frames = inference_batch(torch.FloatTensor(frames))
       print('input_frames len:', len(frames))
