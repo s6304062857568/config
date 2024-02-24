@@ -13,6 +13,9 @@ import numpy as np
 from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
+import torch.nn as nn
+from torchvision import models
+
 from numpy import random
 from google.colab.patches import cv2_imshow
 from IPython.display import display
@@ -41,6 +44,11 @@ from strong_sort.strong_sort import StrongSORT
 
 import cv2
 import numpy as np
+
+from easydict import EasyDict
+from random import randint
+from imutils.video import FPS
+
 
 VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
 
@@ -78,6 +86,43 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
 ):
 
+    args = EasyDict({
+
+        'detector': "yolov3",
+
+        # Path Params
+        'videoPath': "/content/Basketball-Action-Recognition/dataset/examples/0031131.mp4",
+
+        # Player Tracking
+        'classes': ["person"],
+        'tracker': "CSRT",
+        'trackerTypes': ['BOOSTING', 'MIL', 'KCF', 'TLD', 'MEDIANFLOW', 'GOTURN', 'MOSSE', 'CSRT'],
+        'singleTracker': True,
+
+        # Court Line Detection
+        'draw_line': False,
+
+        # YOLOV3 Detector
+        'weights': "yolov3.weights",
+        'config': "yolov3.cfg",
+
+        'COLORS': np.random.uniform(0, 255, size=(1, 3)),
+
+        # Action Recognition
+        'base_model_name': 'r2plus1d_multiclass',
+        'pretrained': True,
+        'lr': 0.0001,
+        'start_epoch': 2,
+        'num_classes': 3,
+        'labels': {"0" : "block", "1" : "pass", "2" : "run", "3" : "dribble", "4" : "shoot", "5" : "ball in hand", "6" : "defense", "7" : "pick" , "8" : "no_action" , "9" : "walk" , "10" : "discard"},
+        'model_path': "model_checkpoints/r2plus1d_augmented-2/",
+        'history_path': "histories/history_r2plus1d_augmented-2.txt",
+        'seq_length': 16,
+        'vid_stride': 8,
+        'output_path': "output_videos/"
+
+    })
+
     result_list = []
     all_frames = read_video_frames(str(source))
     source = str(source)
@@ -110,6 +155,8 @@ def run(
     stride = model.stride.max().cpu().numpy()  # model stride
     imgsz = check_img_size(imgsz[0], s=stride)  # check image size
     
+    # Load model Action Recognition
+    ar_model = Load_model()
 
     # Dataloader
     if webcam:
@@ -308,14 +355,35 @@ def run(
 
       if id not in result_dict or result_dict[id] is None:
         new_arr = []
-        new_arr.append(resized_frame)
+        new_arr.append(np.asarray(resized_frame))
         result_dict[id] = new_arr
       else:
         existing_arr = result_dict[id]
-        existing_arr.append(resized_frame)
+        existing_arr.append(np.asarray(resized_frame))
         result_dict[id] = existing_arr
 
-    print(result_dict)
+    predictions = {}
+    for pid in result_dict:
+      frames = result_dict[pid]
+      #frames = frames[0:16]
+      frames = select_items_with_equal_spacing(frames, 16)
+      print('frames len:', len(frames))
+
+      input_frames = inference_batch(torch.FloatTensor(frames))
+      print('input_frames len:', len(frames))
+      print(input_frames.shape)
+
+      input_frames = input_frames.to(device=device)
+
+      with torch.no_grad():
+          outputs = ar_model(input_frames)
+          _, predsx = torch.max(outputs, 1)
+
+      print(predsx.cpu().numpy().tolist())
+      predictions[pid] = predsx.cpu().numpy().tolist()
+      print('predict id = ',pid, 'action:', args.labels[str(predictions[pid][0])])
+      
+    #print(result_dict)
     return result_list
 
 def read_video_frames(video_path):
@@ -376,6 +444,29 @@ def resize_image_maintain_aspect_ratio(image, target_size=224):
 
     return padded_image
 
+def Load_model():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Initialize R(2+1)D Model
+    model = models.video.r2plus1d_18(pretrained=True, progress=True)
+    # input of the next hidden layer
+    num_ftrs = model.fc.in_features
+    # New Model is trained with 128x176 images
+    # Calculation:
+    model.fc = nn.Linear(num_ftrs, 3, bias=True)
+    
+    pretrained_dict = torch.load('/content/models/r2plus1d_multiclass_16_0.0001.pt', map_location=device)
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
+
+    return model;
+
+def select_items_with_equal_spacing(lst, num_items):
+    step = len(lst) // num_items
+    return lst[::step][:num_items]
+
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--yolo-weights', nargs='+', type=str, default=WEIGHTS / 'yolov7-e6e.pt', help='model.pt path(s)')
@@ -413,14 +504,15 @@ def parse_opt():
 
     return opt
 
+def inference_batch(batch):
+    # (batch, t, h, w, c) --> (batch, c, t, h, w)
+    batch = batch.permute(0, 4, 1, 2, 3)
+    return batch
+
 def detect(vid_path):
   opt = parse_opt()
   opt.source = vid_path
   return run(**vars(opt))
-
-def test():
-    opt = parse_opt()
-    print(opt)
 
 def main(opt):
     check_requirements(requirements=ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
