@@ -365,28 +365,28 @@ def run(
     predictions = {}
     for pid in result_dict:
       frames = result_dict[pid]
-      #frames = frames[0:16]
-      frames = select_items_with_equal_spacing(frames, 16)
       print('frames len:', len(frames))
-      
-      frames = np.asarray(frames)
-      print(frames.shape)
-      frames = np.expand_dims(frames, axis=0)
-      print(frames.shape)
+      if len(frames) > 15:
+        frames = select_items_with_equal_spacing(frames, 16)
+        
+        frames = np.asarray(frames)
+        print(frames.shape)
+        frames = np.expand_dims(frames, axis=0)
+        print(frames.shape)
 
-      input_frames = inference_batch(torch.FloatTensor(frames))
-      print('input_frames len:', len(frames))
-      print(input_frames.shape)
+        input_frames = inference_batch(torch.FloatTensor(frames))
+        print('input_frames len:', len(frames))
+        print(input_frames.shape)
 
-      input_frames = input_frames.to(device=device)
+        input_frames = input_frames.to(device=device)
 
-      with torch.no_grad():
-          outputs = ar_model(input_frames)
-          _, predsx = torch.max(outputs, 1)
+        with torch.no_grad():
+            outputs = ar_model(input_frames)
+            _, predsx = torch.max(outputs, 1)
 
-      print(predsx.cpu().numpy().tolist())
-      predictions[pid] = predsx.cpu().numpy().tolist()
-      print('predict id = ',pid, 'action:', args.labels[str(predictions[pid][0])])
+        print(predsx.cpu().numpy().tolist())
+        predictions[pid] = predsx.cpu().numpy().tolist()
+        print('predict id = ',pid, 'action:', args.labels[str(predictions[pid][0])])
       
     #print(result_dict)
     return result_list
