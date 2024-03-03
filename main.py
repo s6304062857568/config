@@ -1,6 +1,8 @@
 import argparse
 
 import os
+
+from torchvision.models.resnet import List
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -38,7 +40,7 @@ from yolov7.utils.datasets import LoadImages, LoadStreams
 from yolov7.utils.general import (check_img_size, non_max_suppression, scale_coords, check_requirements, cv2,
                                   check_imshow, xyxy2xywh, increment_path, strip_optimizer, colorstr, check_file)
 from yolov7.utils.torch_utils import select_device, time_synchronized
-#from yolov7.utils.plots import plot_one_box, save_one_box
+from yolov7.utils.plots import plot_one_box, save_one_box
 from strong_sort.utils.parser import get_config
 from strong_sort.strong_sort import StrongSORT
 
@@ -124,6 +126,8 @@ def run(
     })
 
     result_list = []
+    frames_person = {}
+    frames_person_id = {}
     all_frames = read_video_frames(str(source))
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -156,7 +160,7 @@ def run(
     imgsz = check_img_size(imgsz[0], s=stride)  # check image size
     
     # Load model Action Recognition
-    ar_model = Load_model()
+    list_model = {}
 
     # Dataloader
     if webcam:
@@ -284,7 +288,37 @@ def run(
                         bbox_w = output[2] - output[0]
                         bbox_h = output[3] - output[1]
 
-                        result_list.append([frame_idx + 1, id, bbox_left, bbox_top, bbox_w, bbox_h, -1, -1, -1, i])
+                        #result_list.append([frame_idx + 1, id, bbox_left, bbox_top, bbox_w, bbox_h, -1, -1, -1, i])
+                        
+                        # new code
+                        #print(frame_idx,bbox_left, bbox_top, bbox_w, bbox_h)
+                        #print(type(frame_idx), type(bbox_left), type(bbox_top), type(bbox_w), type(bbox_h))
+                        #print('all_frames len:', len(all_frames))
+                        croped_frame = crop_frame(all_frames[frame_idx], int(bbox_left), int(bbox_top), int(bbox_w), int(bbox_h))
+
+                        resized_frame = resize_image_maintain_aspect_ratio(croped_frame)
+                        #resized_frames.append(resized_frame)
+                        #cv2.imwrite(f"/content/img/frame_{id}_{fi}.jpg", resized_frame)
+
+                        if id not in frames_person or frames_person[id] is None:
+                          #print ('None')
+                          new_arr = []
+                          new_arr.append(resized_frame)
+                          frames_person[id] = new_arr
+
+                          frames_id = []
+                          frames_id.append(frame_idx)
+                          frames_person_id[id] = frames_id
+                        else:
+                          #print('OK')  
+                          existing_arr = frames_person[id]
+                          existing_arr.append(resized_frame)
+                          frames_person[id] = existing_arr
+
+                          existing_arr_id = frames_person_id[id]
+                          existing_arr_id.append(frame_idx)
+                          frames_person_id[id] = existing_arr_id
+                        
                         # Write MOT compliant results to file
                         #with open(txt_path + '.txt', 'a') as f:
                         #    f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
@@ -293,9 +327,52 @@ def run(
                         if save_vid or save_crop or show_vid:  # Add bbox to image
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
-                            label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
-                                (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
-                            #plot_one_box(bboxes, im0, label=label, color=colors[int(cls)], line_thickness=2)
+                            action = '-'
+
+                            # Prediction action
+                            predictions = {}
+                            if id in frames_person and len(frames_person[id]) > 15:
+                              frames_of_person = frames_person[id]
+                              frames = select_items_with_equal_spacing(frames_of_person, 16, 3)
+
+                              frames_of_person_id = frames_person_id[id]
+                              frames_selected = select_items_with_equal_spacing(frames_of_person_id, 16, 3)
+                              
+                              if len(frames) > 15:
+                                print('\n['+str(id)+'] frames_selected:',frames_selected)
+        
+                                frames = np.asarray(frames)
+                                #print(frames.shape)
+                                frames = np.expand_dims(frames, axis=0)
+                                #print(frames.shape)
+
+                                input_frames = inference_batch(torch.FloatTensor(frames))
+                                #print('input_frames len:', len(frames))
+                                #print(input_frames.shape)
+
+                                input_frames = input_frames.to(device=device)
+
+                                action_model = None
+                                with torch.no_grad():
+                                    if id in list_model:
+                                      action_model = list_model[id]
+                                    else:
+                                      action_model = Load_model()
+                                      list_model[id] = action_model
+
+                                    outputs_action = action_model(input_frames)
+                                    _, predsx = torch.max(outputs_action, 1)
+
+                                #print(predsx.cpu().numpy().tolist())
+                                predictions[id] = predsx.cpu().numpy().tolist()
+                                print('predict id = ',id, 'action:', args.labels[str(predictions[id][0])],'\n')
+                                action = args.labels[str(predictions[id][0])]
+                            
+                            label = f'{id} {names[c]} : {action}'
+
+                            #label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
+                            #    (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
+                            plot_one_box(bboxes, im0, label=label, color=colors[int(cls)], line_thickness=2)
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 #save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
@@ -338,57 +415,6 @@ def run(
     if update:
         strip_optimizer(yolo_weights)  # update model (to fix SourceChangeWarning)
 
-    # Resize each frame
-    resized_frames = []
-    result_dict = {}
-    for f in result_list:
-      fi = int(f[0])
-      id = int(f[1])
-
-      bbox_left, bbox_top, bbox_w, bbox_h = int(f[2]), int(f[3]), int(f[4]), int(f[5])
-
-      croped_frame = crop_frame(all_frames[f[0]-1], bbox_left, bbox_top, bbox_w, bbox_h)
-
-      resized_frame = resize_image_maintain_aspect_ratio(croped_frame)
-      resized_frames.append(resized_frame)
-      cv2.imwrite(f"/content/img/frame_{id}_{fi}.jpg", resized_frame)
-
-      if id not in result_dict or result_dict[id] is None:
-        new_arr = []
-        new_arr.append(resized_frame)
-        result_dict[id] = new_arr
-      else:
-        existing_arr = result_dict[id]
-        existing_arr.append(resized_frame)
-        result_dict[id] = existing_arr
-
-    predictions = {}
-    for pid in result_dict:
-      frames = result_dict[pid]
-      print('frames len:', len(frames))
-      if len(frames) > 15:
-        frames = select_items_with_equal_spacing(frames, 16)
-        
-        frames = np.asarray(frames)
-        print(frames.shape)
-        frames = np.expand_dims(frames, axis=0)
-        print(frames.shape)
-
-        input_frames = inference_batch(torch.FloatTensor(frames))
-        print('input_frames len:', len(frames))
-        print(input_frames.shape)
-
-        input_frames = input_frames.to(device=device)
-
-        with torch.no_grad():
-            outputs = ar_model(input_frames)
-            _, predsx = torch.max(outputs, 1)
-
-        print(predsx.cpu().numpy().tolist())
-        predictions[pid] = predsx.cpu().numpy().tolist()
-        print('predict id = ',pid, 'action:', args.labels[str(predictions[pid][0])])
-      
-    #print(result_dict)
     return result_list
 
 def read_video_frames(video_path):
@@ -471,6 +497,10 @@ def Load_model():
 def select_items_with_equal_spacing(lst, num_items):
     step = len(lst) // num_items
     return lst[::step][:num_items]
+
+def select_items_with_equal_spacing(lst, num_items, step):
+    start_index = max(len(lst) - num_items * step, 0)  # หาดัชนีเริ่มต้น
+    return lst[start_index::step]  # ใช้การ slice และกำหนด step
 
 def parse_opt():
     parser = argparse.ArgumentParser()
