@@ -130,6 +130,7 @@ def run(
     result_list = []
     frames_person = {}
     frames_person_id = {}
+    window_size = 16
     all_frames = read_video_frames(str(source))
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -164,6 +165,7 @@ def run(
     # Load model Action Recognition
     list_model = {}
     list_deque = {}
+    classes_list = ["pick", "stand", "walk"]
 
     # Dataloader
     if webcam:
@@ -284,6 +286,7 @@ def run(
                         bboxes = output[0:4]
                         id = output[4]
                         cls = output[5]
+                        action = '-'
 
                         # to MOT format
                         bbox_left = output[0]
@@ -305,88 +308,38 @@ def run(
                         normalized_frame = resized_frame / 255
 
                         # Load model by id
-                        model_prd = load_model_by_id(id, list_model)
+                        model_pred = load_model_by_id(id, list_model)
 
                         # Load deque by id
-                        deque_item = load_deque_by_id(id, list_deque)
+                        predicted_labels_probabilities_deque = load_deque_by_id(id, list_deque)
 
-                        
-                        #resized_frames.append(resized_frame)
-                        #cv2.imwrite(f"/content/img/frame_{id}_{fi}.jpg", resized_frame)
+                        # Passing the Image Normalized Frame to the model and receiving Predicted Probabilities.
+                        predicted_labels_probabilities = model_pred.predict(np.expand_dims(normalized_frame, axis = 0))[0]
+                
+                        # Appending predicted label probabilities to the deque object
+                        predicted_labels_probabilities_deque.append(predicted_labels_probabilities)
+                
+                        action = '-'
+                        # Assuring that the Deque is completely filled before starting the averaging process
+                        if len(predicted_labels_probabilities_deque) == window_size:
 
-                        # if id not in frames_person or frames_person[id] is None:
-                        #   #print ('None')
-                        #   new_arr = []
-                        #   new_arr.append(resized_frame)
-                        #   frames_person[id] = new_arr
-
-                        #   frames_id = []
-                        #   frames_id.append(frame_idx)
-                        #   frames_person_id[id] = frames_id
-                        # else:
-                        #   #print('OK')  
-                        #   existing_arr = frames_person[id]
-                        #   existing_arr.append(resized_frame)
-                        #   frames_person[id] = existing_arr
-
-                        #   existing_arr_id = frames_person_id[id]
-                        #   existing_arr_id.append(frame_idx)
-                        #   frames_person_id[id] = existing_arr_id
-                        
-                        # Write MOT compliant results to file
-                        #with open(txt_path + '.txt', 'a') as f:
-                        #    f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
-                        #                                    bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
-
+                            # Converting Predicted Labels Probabilities Deque into Numpy array
+                            predicted_labels_probabilities_np = np.array(predicted_labels_probabilities_deque)
+                
+                            # Calculating Average of Predicted Labels Probabilities Column Wise 
+                            predicted_labels_probabilities_averaged = predicted_labels_probabilities_np.mean(axis = 0)
+                
+                            # Converting the predicted probabilities into labels by returning the index of the maximum value.
+                            predicted_label = np.argmax(predicted_labels_probabilities_averaged)
+                
+                            # Accessing The Class Name using predicted label.
+                            action = classes_list[predicted_label]
+                            print('predict id = ',int(id), 'action:', action,'\n')
+                          
                         if save_vid or save_crop or show_vid:  # Add bbox to image
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
-                            action = '-'
 
-                            # Prediction action
-                            # predictions = {}
-                            # if id in frames_person and len(frames_person[id]) > 15:
-                            #   frames_of_person = frames_person[id]
-                            #   frames = select_items_with_equal_spacing(frames_of_person, 16, 3)
-
-                            #   frames_of_person_id = frames_person_id[id]
-                            #   frames_selected = select_items_with_equal_spacing(frames_of_person_id, 16, 3)
-                              
-                            #   if len(frames) > 15:
-                            #     print('\n['+str(id)+'] frames_selected:',frames_selected)
-        
-                                #frames = np.asarray(frames)
-                                #print(frames.shape)
-                                #frames = np.expand_dims(frames, axis=0)
-                                #print(frames.shape)
-
-                                #input_frames = inference_batch(torch.FloatTensor(frames))
-                                #print('input_frames len:', len(frames))
-                                #print(input_frames.shape)
-
-                                #input_frames = input_frames.to(device=device)
-
-                                # action_model = None
-                                # with torch.no_grad():
-                                #     if id in list_model:
-                                #       action_model = list_model[id]
-                                #     else:
-                                #       action_model = Load_CNN_model()
-                                #       list_model[id] = action_model
-
-                                #     # Predict
-                                #     predicted_labels_probabilities = action_model.predict(np.expand_dims(frames, axis=0))[0]
-                                #     predicted_label = np.argmax(predicted_labels_probabilities)
-
-                                #     CLASSES_LIST = ["pick", "stand", "walk"]
-                                #     action = CLASSES_LIST[predicted_label]
-
-                                # #print(predsx.cpu().numpy().tolist())
-                                # #predictions[id] = predsx.cpu().numpy().tolist()
-                                # #print('predict id = ',id, 'action:', args.labels[str(predictions[id][0])],'\n')
-                                # print('predict id = ',id, 'action:', action,'\n')
-                                #action = args.labels[str(predictions[id][0])]
-                            
                             label = f'{id} {names[c]} : {action}'
 
                             #label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
@@ -494,26 +447,6 @@ def resize_image_maintain_aspect_ratio(image, target_size=224):
 
     return padded_image
 
-def Load_model():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Initialize R(2+1)D Model
-    model = models.video.r2plus1d_18(pretrained=True, progress=True)
-    # input of the next hidden layer
-    num_ftrs = model.fc.in_features
-    # New Model is trained with 128x176 images
-    # Calculation:
-    model.fc = nn.Linear(num_ftrs, 3, bias=True)
-    
-    pretrained_dict = torch.load('/content/models/r2plus1d_multiclass_16_0.0001.pt', map_location=device)
-    model_dict = model.state_dict()
-    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-    model_dict.update(pretrained_dict)
-    model.load_state_dict(model_dict)
-    model = model.to(device)
-
-    return model;
-
 def Load_CNN_model():
     CNN_model = load_model('/content/models/CNN_model_Date_Time_2024_03_16_08_15_26_Loss0.0244_Accuracy_0.9941605925559998_n1.h5')
     return CNN_model
@@ -522,11 +455,11 @@ def load_model_by_id(id, list_model):
     action_model = None
     if id in list_model:
       action_model = list_model[id]
-      print('Load existing model of id:',id)
+      #print('Load existing model of id:',id)
     else:
       action_model = Load_CNN_model()
       list_model[id] = action_model
-      print('Load new model of id:',id)
+      #print('Load new model of id:',id)
 
     return action_model
 
@@ -534,11 +467,11 @@ def load_deque_by_id(id, list_deque):
     deque_item = None
     if id in list_deque:
       deque_item = list_deque[id]
-      print('Load existing deque of id:',id)
+      #print('Load existing deque of id:',id)
     else:
       deque_item = deque(maxlen = 16)
       list_deque[id] = deque_item
-      print('Load new deque of id:',id)
+      #print('Load new deque of id:',id)
 
     return deque_item
 
