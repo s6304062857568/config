@@ -491,6 +491,7 @@ def Load_model():
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
+    model.to(device)
 
     return model;
 
