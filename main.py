@@ -486,7 +486,7 @@ def Load_model():
     # Calculation:
     model.fc = nn.Linear(num_ftrs, 3, bias=True)
     
-    pretrained_dict = torch.load('/content/models/r2plus1d_multiclass_16_0.0001.pt', map_location=device)
+    pretrained_dict = torch.load('/content/models/r2plus1d_multiclass_20_0.0001.pt', map_location=device)
     model_dict = model.state_dict()
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
     model_dict.update(pretrained_dict)
