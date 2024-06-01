@@ -482,7 +482,7 @@ def resize_image_maintain_aspect_ratio(image, target_size=224):
     return padded_image
 
 def Load_LRCN_model():
-    LRCN_model = load_model('/content/models/LRCN_model_Date_Time_2024_03_16_07_08_14_Loss0.3002_Accuracy_0.9069767594337463_n3.h5')
+    LRCN_model = load_model('/content/models/LRCN_model_Date_Time_2024_06_01_12_14_02_Loss0.28390315855158854_Accuracy_0.9534883720930233_n1.h5')
     return LRCN_model
 
 def select_items_with_equal_spacing(lst, num_items):
