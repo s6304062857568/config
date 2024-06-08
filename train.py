@@ -43,7 +43,7 @@ args = EasyDict({
     'annotation_path': "/content/dataset_videos/annotation_dict.json",
     'augmented_annotation_path': "/content/dataset_videos/augmented_annotation_dict.json",
     'model_path': "/content/Basketball-Action-Recognition/model_checkpoints/r2plus1d_augmented/",
-    'history_path': "/content/Basketball-Action-Recognition/histories/history_r2plus1d_augmented.txt"
+    'history_path': "/content/Basketball-Action-Recognition/histories/history_r2plus1d_augmented_evaluate.txt"
 })
 
 def train_model(model, dataloaders, criterion, optimizer, args, start_epoch=1, num_epochs=25):
