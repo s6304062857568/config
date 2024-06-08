@@ -176,9 +176,11 @@ def read_history(history_path):
     with open(history_path, 'r') as hist:
 
         # get all lines
+        #print('get all lines')
         all_lines = hist.readlines()
 
         # remove newlines for easier processing
+        #print('remove newlines for easier processing')
         rem_newline = []
         for line in all_lines:
             if len(line) == 1 and line == '\n':
@@ -186,6 +188,7 @@ def read_history(history_path):
             rem_newline.append(line)
 
         # get individual training sessions
+        #print('get individual training sessions')
         base_names = []
         base_indices = []
         for i in range(len(rem_newline)):
@@ -194,18 +197,22 @@ def read_history(history_path):
                 base_indices.append(i)
 
         # create plots for each individual session
+        #print('create plots for each individual session')
         for i in range(len(base_names)):
             name = base_names[i]
 
             # get last session
+            #print('get last session')
             if i == len(base_names) - 1:
                 session_data = rem_newline[base_indices[i]:]
 
             # get session
             else:
+                #print('get session')
                 session_data = rem_newline[base_indices[i]: base_indices[i + 1]]
 
             # now generate the plots
+            #print('now generate the plots')
             train_plot_loss = []
             val_plot_loss = []
             train_plot_acc = []
@@ -221,25 +228,29 @@ def read_history(history_path):
                     print(line)
 
                 # case for getting checkpoint epoch
-                if 'checkpoint' in line:
+                if line.startswith("checkpoint"):
+                    #print("case for getting checkpoint epoch")
                     print(line)
                     plot_epoch.append(int(line.split('_')[-2]))
 
                 # case for getting train data for epoch
-                elif 'train' in line and 'arguments' not in line:
+                elif line.startswith("train") and 'arguments' not in line:
+                    #print("case for getting train data for epoch")
                     print(line)
-                    train_plot_loss.append(float(line.split(' ')[2]))
-                    train_plot_acc.append(float(line.split(' ')[6]))
-                    train_plot_f1.append(float(line.split(' ')[10]))
+                    train_plot_loss.append(float(line.split(' ')[2].replace("+0j", "").replace("(", "").replace(")", "")))
+                    train_plot_acc.append(float(line.split(' ')[6].replace("+0j", "").replace("(", "").replace(")", "")))
+                    train_plot_f1.append(float(line.split(' ')[10].replace("+0j", "").replace("(", "").replace(")", "")))
 
                 # case for getting val data for epoch
-                elif 'val' in line:
+                elif 'val' in line and 'arguments' not in line:
+                    #print("case for getting val data for epoch")  
                     print(line)
-                    val_plot_loss.append(float(line.split(' ')[2]))
-                    val_plot_acc.append(float(line.split(' ')[6]))
-                    val_plot_f1.append(float(line.split(' ')[10]))
+                    val_plot_loss.append(float(line.split(' ')[2].replace("+0j", "").replace("(", "").replace(")", "")))
+                    val_plot_acc.append(float(line.split(' ')[6].replace("+0j", "").replace("(", "").replace(")", "")))
+                    val_plot_f1.append(float(line.split(' ')[10].replace("+0j", "").replace("(", "").replace(")", "")))
 
             # plot
+            print("plot")  
             plot_curves(
                 name,
                 train_plot_loss,
@@ -252,4 +263,4 @@ def read_history(history_path):
             )
 
 if __name__ == "__main__":
-    read_history("../histories/history_r2plus1d_overfit.txt")
+    read_history("/content/Basketball-Action-Recognition/histories/history_r2plus1d_augmented_evaluate.txt")
