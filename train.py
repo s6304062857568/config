@@ -36,8 +36,8 @@ args = EasyDict({
     'num_classes': 3,
     'batch_size': 8,
     'n_total': 1070,
-    'test_n': 117,
-    'val_n': 234,
+    'test_n': 107,
+    'val_n': 214,
 
     # Path params
     'annotation_path': "/content/dataset_videos/annotation_dict.json",
