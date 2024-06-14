@@ -13,8 +13,8 @@ def get_acc_f1_precision_recall(pred_classes, ground_truths, labels=[0, 1, 2]):
     print(ground_truths)
 
     accuracy = np.mean((pred_classes == ground_truths)).astype(np.cfloat)
-    f1 = f1_score(ground_truths, pred_classes, labels=labels, average='micro')
-    precision = precision_score(ground_truths, pred_classes, labels=labels, average='micro')
-    recall = recall_score(ground_truths, pred_classes, labels=labels, average='micro')
+    f1 = f1_score(ground_truths, pred_classes, labels=labels, average='weighted')
+    precision = precision_score(ground_truths, pred_classes, labels=labels, average='weighted')
+    recall = recall_score(ground_truths, pred_classes, labels=labels, average='weighted')
 
     return accuracy, f1, precision, recall
