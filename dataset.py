@@ -6,6 +6,23 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+class SplitDataset(Dataset):
+  def __init__(self, X, y):
+      assert len(X) == len(y)
+      self.video_list = []
+
+      for index in range(len(X)):
+        object = {}
+        object['video'] = X[index]
+        object['action'] = y[index]
+        self.video_list.append(object)
+   
+  def __len__(self):
+      # return length of none-flipped videos in directory
+      return len(self.video_list)
+ 
+  def __getitem__(self, idx):
+      return self.video_list[idx]
 
 class CustomDataset(Dataset):
     """CustomDataset: a Dataset for Human Action Recognition."""
