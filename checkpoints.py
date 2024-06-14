@@ -100,9 +100,9 @@ def plot_curves(base_model_name, train_loss, val_loss, train_acc, val_acc, train
     plt.title('f1 curves')
     plt.legend()
 
-    plt.suptitle(f'Session: {base_model_name}_{fold}_{epochs}')
+    plt.suptitle(f'Session: {base_model_name}_{fold}')
 
-    plt.savefig(f'{base_model_name}_{fold}_{epochs}.png')
+    plt.savefig(f'{base_model_name}_{fold}.png')
     plt.show()
 
 def write_history(
