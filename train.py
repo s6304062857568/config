@@ -16,9 +16,12 @@ import torchvision
 from torchvision import models
 from torch.utils.data import DataLoader, random_split
 
-from dataset import CustomDataset
+from dataset import CustomDataset, SplitDataset
 from utils.checkpoints import init_session_history, save_weights, load_weights, write_history, read_history, plot_curves
 from utils.metrics import get_acc_f1_precision_recall
+
+from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 
 args = EasyDict({
 
@@ -28,7 +31,7 @@ args = EasyDict({
     # training/model params
     'lr': 0.0001,
     'start_epoch': 1,
-    'num_epochs': 25,
+    'num_epochs': 15,
     'layers_list': ['layer3', 'layer4', 'fc'],
     'continue_epoch': False,
 
@@ -46,7 +49,7 @@ args = EasyDict({
     'history_path': "/content/Basketball-Action-Recognition/histories/history_r2plus1d_augmented_evaluate.txt"
 })
 
-def train_model(model, dataloaders, criterion, optimizer, args, start_epoch=1, num_epochs=25):
+def train_model(model, dataloaders, criterion, optimizer, args, fold, start_epoch=1, num_epochs=25):
     """
     Trains the 3D CNN Model
     :param model: Model object that we will train
@@ -185,7 +188,7 @@ def train_model(model, dataloaders, criterion, optimizer, args, start_epoch=1, n
                 train_loss = epoch_loss
 
         # Save Weights
-        model_name = save_weights(model, args, epoch, optimizer)
+        model_name = save_weights(model, args, epoch, fold, optimizer)
 
         # Write History after train and validation phase
         write_history(
@@ -296,60 +299,82 @@ if __name__ == "__main__":
     basketball_dataset = CustomDataset(annotation_dict='/content/dataset_videos/annotation_dict.json',
                                            augmented_dict='/content/dataset_videos/augmented_annotation_dict.json')
 
-    train_subset, test_subset = random_split(
-    basketball_dataset, [args.n_total-args.test_n, args.test_n], generator=torch.Generator().manual_seed(1))
 
-    train_subset, val_subset = random_split(
-        train_subset, [args.n_total-args.test_n-args.val_n, args.val_n], generator=torch.Generator().manual_seed(1))
+    X = [row['video'] for row in basketball_dataset]
+    y = [row['action'] for row in basketball_dataset]
 
-    train_loader = DataLoader(dataset=train_subset, shuffle=True, batch_size=args.batch_size)
-    val_loader = DataLoader(dataset=val_subset, shuffle=False, batch_size=args.batch_size)
-    test_loader = DataLoader(dataset=test_subset, shuffle=False, batch_size=args.batch_size)
-    print('train_loader len:', len(train_loader))
-    print('val_loader len:', len(val_loader))
-    print('test_loader len:', len(test_loader))
-    dataloaders_dict = {'train': train_loader, 'val': val_loader}
+    msss = MultilabelStratifiedShuffleSplit(n_splits=5, test_size=0.1, random_state=92)
 
-    # Train
-    optimizer_ft = optim.Adam(params_to_update, lr=args.lr)
+    fold_n = 1;
+    for train_index, test_index in msss.split(X, y):
+        X_train = [X[index] for index in train_index]
+        y_train = [y[index] for index in train_index]
+    
+        X_test = [X[index] for index in test_index]
+        y_test = [y[index] for index in test_index]
+        
+        X_train,X_val,y_train,y_val = train_test_split(X_train,y_train,
+                                                      test_size = 0.222,shuffle = True,
+                                                      random_state = 53)
+  
+        print('train len:', len(X_train))
+        print('val len:', len(X_val))
+        print('test len:', len(X_test))
+        print('###############################')
 
-    criterion = nn.CrossEntropyLoss()
+        fold_dataset_train = SplitDataset(X_train, y_train)
+        fold_dataset_test = SplitDataset(X_test, y_test)
+        fold_dataset_val = SplitDataset(X_val, y_val)
 
-    if args.continue_epoch:
-        print('load_weights....')
-        model = load_weights(model, args)
+        train_loader = DataLoader(dataset=fold_dataset_train, shuffle=True, batch_size=args.batch_size)
+        val_loader = DataLoader(dataset=fold_dataset_val, shuffle=False, batch_size=args.batch_size)
+        test_loader = DataLoader(dataset=fold_dataset_test, shuffle=False, batch_size=args.batch_size)
+        
+        dataloaders_dict = {'train': train_loader, 'val': val_loader}
 
-    if torch.cuda.is_available():
-        # Put model into device after updating parameters
-        model = model.to(device)
-        criterion = criterion.to(device)
+        # Train
+        optimizer_ft = optim.Adam(params_to_update, lr=args.lr)
 
-    # Train and evaluate
-    model, train_loss_history, val_loss_history, train_acc_history, val_acc_history, train_f1_score, val_f1_score, plot_epoch = train_model(model,
-                                                                                                                                            dataloaders_dict,
-                                                                                                                                            criterion,
-                                                                                                                                            optimizer_ft,
-                                                                                                                                            args,
-                                                                                                                                            start_epoch=args.start_epoch,
-                                                                                                                                            num_epochs=args.num_epochs)
+        criterion = nn.CrossEntropyLoss()
 
-    print("Best Validation Loss: ", min(val_loss_history), "Epoch: ", val_loss_history.index(min(val_loss_history)))
-    print("Best Training Loss: ", min(train_loss_history), "Epoch: ", train_loss_history.index(min(train_loss_history)))
+        if args.continue_epoch:
+            print('load_weights....')
+            model = load_weights(model, args)
 
-    # # Plot Final Curve
-    plot_curves(
-        args.base_model_name,
-        train_loss_history,
-        val_loss_history,
-        train_acc_history,
-        val_acc_history,
-        train_f1_score,
-        val_f1_score,
-        plot_epoch
-    )
+        if torch.cuda.is_available():
+            # Put model into device after updating parameters
+            model = model.to(device)
+            criterion = criterion.to(device)
 
-    # # Read History
-    #read_history(args.history_path)
+        # Train and evaluate
+        model, train_loss_history, val_loss_history, train_acc_history, val_acc_history, train_f1_score, val_f1_score, plot_epoch = train_model(model,
+                                                                                                                                                dataloaders_dict,
+                                                                                                                                                criterion,
+                                                                                                                                                optimizer_ft,
+                                                                                                                                                args,
+                                                                                                                                                fold_n,
+                                                                                                                                                start_epoch=args.start_epoch,
+                                                                                                                                                num_epochs=args.num_epochs)
 
-    # # Check Accuracy with Test Set
-    check_accuracy(test_loader, model)
+        print("Best Validation Loss: ", min(val_loss_history), "Epoch: ", val_loss_history.index(min(val_loss_history)))
+        print("Best Training Loss: ", min(train_loss_history), "Epoch: ", train_loss_history.index(min(train_loss_history)))
+
+        # # Plot Final Curve
+        plot_curves(
+            args.base_model_name,
+            train_loss_history,
+            val_loss_history,
+            train_acc_history,
+            val_acc_history,
+            train_f1_score,
+            val_f1_score,
+            plot_epoch
+        )
+
+        # # Read History
+        #read_history(args.history_path)
+
+        # # Check Accuracy with Test Set
+        check_accuracy(test_loader, model)
+
+        fold_n += 1
