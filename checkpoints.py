@@ -17,7 +17,7 @@ def init_session_history(args):
             + 'arguments: {}\n'.format(args)
         )
 
-def save_weights(model, args, epoch, optimizer):
+def save_weights(model, args, epoch, fold, optimizer):
     """
     Saves a state dictionary given a model, epoch, the epoch its training in, and the optimizer
     :param base_model_name: name of the base model in training session
@@ -37,11 +37,11 @@ def save_weights(model, args, epoch, optimizer):
     if not os.path.exists(args.model_path):
         os.mkdir(args.model_path)
 
-    model_name = '{}_{}_{}'.format(args.base_model_name, epoch, args.lr)
+    model_name = '{}_{}_{}_{}'.format(args.base_model_name, fold, epoch, args.lr)
     torch.save(state, '{}/{}.pt'.format(args.model_path, model_name))
     return model_name
 
-def load_weights(model, args):
+def load_weights(model, args, target_fold):
     """
     Loads previously trained weights into a model given an epoch and the model itself
     :param base_model_name: name of the base model in training session
@@ -51,7 +51,7 @@ def load_weights(model, args):
     :return: the model with weights loaded in
     """
 
-    pretrained_dict = torch.load('{}/{}_{}_{}.pt'.format(args.model_path, args.base_model_name, args.start_epoch, args.lr))['state_dict']
+    pretrained_dict = torch.load('{}/{}_{}_{}_{}.pt'.format(args.model_path, args.base_model_name, target_fold, args.start_epoch, args.lr))['state_dict']
     model_dict = model.state_dict()
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
     model_dict.update(pretrained_dict)
@@ -60,7 +60,7 @@ def load_weights(model, args):
     return model
 
 
-def plot_curves(base_model_name, train_loss, val_loss, train_acc, val_acc, train_f1, val_f1, epochs):
+def plot_curves(base_model_name, train_loss, val_loss, train_acc, val_acc, train_f1, val_f1, epochs, fold):
     """
     Given progression of train/val loss/acc, plots curves
     :param base_model_name: name of base model in training session
@@ -100,9 +100,9 @@ def plot_curves(base_model_name, train_loss, val_loss, train_acc, val_acc, train
     plt.title('f1 curves')
     plt.legend()
 
-    plt.suptitle(f'Session: {base_model_name}')
+    plt.suptitle(f'Session: {base_model_name}_{fold}_{epochs}')
 
-    plt.savefig('previous_run.png')
+    plt.savefig(f'{base_model_name}_{fold}_{epochs}.png')
     plt.show()
 
 def write_history(
