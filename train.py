@@ -368,7 +368,8 @@ if __name__ == "__main__":
             val_acc_history,
             train_f1_score,
             val_f1_score,
-            plot_epoch
+            plot_epoch,
+            fold_n
         )
 
         # # Read History
