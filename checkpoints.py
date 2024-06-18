@@ -198,6 +198,7 @@ def read_history(history_path):
 
         # create plots for each individual session
         #print('create plots for each individual session')
+        fold = 0
         for i in range(len(base_names)):
             name = base_names[i]
 
@@ -230,8 +231,9 @@ def read_history(history_path):
                 # case for getting checkpoint epoch
                 if line.startswith("checkpoint"):
                     #print("case for getting checkpoint epoch")
-                    print(line)
+                    print("fold =",fold," epoch-",line.split('_')[-2]," ",line)
                     plot_epoch.append(int(line.split('_')[-2]))
+                    fold = int(line.split('_')[-3])
 
                 # case for getting train data for epoch
                 elif line.startswith("train") and 'arguments' not in line:
@@ -259,7 +261,8 @@ def read_history(history_path):
                 val_plot_acc,
                 train_plot_f1,
                 val_plot_f1,
-                plot_epoch
+                plot_epoch,
+                fold
             )
 
 if __name__ == "__main__":
