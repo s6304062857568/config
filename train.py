@@ -7,7 +7,7 @@ import time
 from tqdm import tqdm
 from easydict import EasyDict
 from vidaug import augmentors as vidaug
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report
 
 import torch
 import torch.nn as nn
@@ -22,6 +22,9 @@ from utils.metrics import get_acc_f1_precision_recall
 
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from sklearn.model_selection import train_test_split
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 args = EasyDict({
 
@@ -219,16 +222,34 @@ def train_model(model, dataloaders, criterion, optimizer, args, fold, start_epoc
 def check_accuracy(loader, model):
     num_correct = 0
     num_samples = 0
-    model.eval()
+    model.eval()  # Set model to evaluate mode
+    test_pred_classes = []
+    test_ground_truths = []
+
+    test_acc_history = []
+    test_loss_history = []
+    test_precision_score = []
+    test_recal_score = []
+    test_f1_score = []
 
     with torch.no_grad():
         i = args.batch_size
 
         pbar = tqdm(loader)
+        
         for sample in pbar:
             x = sample["video"].to(device=device)
             y = sample["action"].to(device=device)
 
+            # new code
+            outputs = model(x)
+            loss = criterion(outputs, torch.max(y, 1)[1])
+
+            _, preds = torch.max(outputs, 1)
+
+            test_pred_classes.extend(preds.detach().cpu().numpy())
+            test_ground_truths.extend(torch.max(y, 1)[1].detach().cpu().numpy())
+            
             scores = model(x)
             print(scores)
             predictions = scores.argmax (1)
@@ -241,6 +262,39 @@ def check_accuracy(loader, model):
             i += args.batch_size
 
         print(f'Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}')
+
+        target_names = ['pick', 'stand', 'walk']
+
+        # Generate confusion matrix for the predictions
+        conf_matrix = confusion_matrix(test_ground_truths, test_pred_classes)
+
+        plt.figure(figsize=(8,8))
+        sns.set(font_scale = 1.5)
+
+        test_accuracy, test_f1, test_precision, test_recall = get_acc_f1_precision_recall(
+                test_pred_classes, test_ground_truths
+            )
+
+        sensitivity = []
+        specificity = []
+
+        for i in range(conf_matrix.shape[0]):
+            tp = conf_matrix[i, i]
+            fn = conf_matrix[i, :].sum() - tp
+            fp = conf_matrix[:, i].sum() - tp
+            tn = conf_matrix.sum() - (tp + fn + fp)
+
+            sensitivity_i = tp / (tp + fn)
+            specificity_i = tn / (tn + fp)
+
+            sensitivity.append(sensitivity_i)
+            specificity.append(specificity_i)
+
+        print(f'Sensitivity (per class): {np.round(sensitivity, 4)}')
+        print(f'Specificity (per class): {np.round(specificity, 4)}')
+        print(classification_report(test_ground_truths, test_pred_classes, target_names=target_names))
+
+        
 
     model.train()
 
