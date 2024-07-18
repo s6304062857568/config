@@ -65,9 +65,9 @@ class CustomDataset(Dataset):
     def VideoToNumpy(self, video_id):
         # get video
         video = cv2.VideoCapture(self.video_dir + video_id + ".mp4")
-        frame_size = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        if frame_size > 16:
-            print(f'video_id: {video_id} has over frame size({frame_size})')
+        video_frames_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        #if video_frames_count > 16:
+        #    print(f'video_id: {video_id} has over frame size({video_frames_count})')
 
         if not video.isOpened():
             video = cv2.VideoCapture(self.augmented_dir + video_id + ".mp4")
@@ -77,20 +77,32 @@ class CustomDataset(Dataset):
         video_frames = []
         max_frames = 16
         frame_count = 0
-        while (video.isOpened()):
-            # read video
-            success, frame = video.read()
+
+        if video_frames_count > max_frames:
+          skip_frames_window = max(int(video_frames_count/max_frames),1) #default skip is 1
+          for frame_counter in range(max_frames):
+            video.set(cv2.CAP_PROP_POS_FRAMES,frame_counter*skip_frames_window)
+            success,frame = video.read()
             if not success:
-                break
+              break
 
             frame = np.asarray([frame[..., i] for i in range(frame.shape[-1])]).astype(float)
             video_frames.append(frame)
+        else:
+          while (video.isOpened()):
+              # read video
+              success, frame = video.read()
+              if not success:
+                  break
 
-            frame_count += 1
+              frame = np.asarray([frame[..., i] for i in range(frame.shape[-1])]).astype(float)
+              video_frames.append(frame)
 
-            # Break the loop if the desired number of frames is reached
-            if frame_count == max_frames:
-                break     
+              frame_count += 1
+
+              # Break the loop if the desired number of frames is reached
+              if frame_count == max_frames:
+                  break     
 
         video.release()
         assert len(video_frames) == 16
@@ -248,6 +260,6 @@ if __name__ == "__main__":
     custom_dataset = CustomDataset(annotation_dict="/content/dataset_videos/annotation_dict.json",
                                        augmented_dict="/content/dataset_videos/augmented_annotation_dict.json")
               
-    print(custom_dataset[1]['video_id'])
-    print(custom_dataset[1]['class'])
+    print(custom_dataset[2]['video_id'])
+    print(custom_dataset[2]['class'])
     print(len(custom_dataset))
