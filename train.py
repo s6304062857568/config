@@ -41,9 +41,12 @@ args = EasyDict({
     # Dataset params
     'num_classes': 3,
     'batch_size': 8,
-    'n_total': 1070,
-    'test_n': 107,
-    'val_n': 214,
+    # 'n_total': 1070,
+    # 'test_n': 107,
+    # 'val_n': 214,
+    'n_total': 1965,
+    'test_n': 196,
+    'val_n': 392,
 
     # Path params
     'annotation_path': "/content/dataset_videos/annotation_dict.json",
@@ -357,9 +360,9 @@ if __name__ == "__main__":
     X = [row['video'] for row in basketball_dataset]
     y = [row['action'] for row in basketball_dataset]
 
-    msss = MultilabelStratifiedShuffleSplit(n_splits=5, test_size=0.1, random_state=92)
+    msss = MultilabelStratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=24)
 
-    fold_n = 1;
+    fold_n = 5;
     for train_index, test_index in msss.split(X, y):
         X_train = [X[index] for index in train_index]
         y_train = [y[index] for index in train_index]
