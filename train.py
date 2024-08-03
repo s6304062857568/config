@@ -10,6 +10,7 @@ from vidaug import augmentors as vidaug
 from sklearn.metrics import confusion_matrix, classification_report
 
 import torch
+import gc
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
@@ -311,40 +312,6 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Initialize R(2+1)D Model
-    model = models.video.r2plus1d_18(pretrained=args.pretrained, progress=True)
-
-    # change final fully-connected layer to output 3 classes
-    for param in model.parameters():
-        param.requires_grad = False
-
-    for name, param in model.named_parameters():
-        for layer in args.layers_list:
-            if layer in name:
-                param.requires_grad = True
-
-    # input of the next hidden layer
-    num_ftrs = model.fc.in_features
-    # New Model is trained with 224x224 images
-    # Calculation:
-    model.fc = nn.Linear(num_ftrs, args.num_classes, bias=True)
-    print(model)
-
-    params_to_update = model.parameters()
-    print("Params to learn:")
-    params_to_update = []
-    for name, param in model.named_parameters():
-        if param.requires_grad == True:
-            params_to_update.append(param)
-            print("\t", name)
-
-    if device.type == 'cuda':
-        print(torch.cuda.get_device_name(0))
-        print('Memory Usage:')
-        print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-        print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
-        print(" ")
-
     # Transforms
     sometimes = lambda aug: vidaug.Sometimes(0.5, aug)  # Used to apply augmentor with 50% probability
     video_augmentation = vidaug.Sequential([
@@ -360,7 +327,7 @@ if __name__ == "__main__":
     X = [row['video'] for row in basketball_dataset]
     y = [row['action'] for row in basketball_dataset]
 
-    msss = MultilabelStratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=24)
+    msss = MultilabelStratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=14)
 
     fold_n = 5;
     for train_index, test_index in msss.split(X, y):
@@ -378,6 +345,40 @@ if __name__ == "__main__":
         print('val len:', len(X_val))
         print('test len:', len(X_test))
         print('###############################')
+
+        # Initialize R(2+1)D Model
+        model = models.video.r2plus1d_18(pretrained=args.pretrained, progress=True)
+
+        # change final fully-connected layer to output 3 classes
+        for param in model.parameters():
+            param.requires_grad = False
+
+        for name, param in model.named_parameters():
+            for layer in args.layers_list:
+                if layer in name:
+                    param.requires_grad = True
+
+        # input of the next hidden layer
+        num_ftrs = model.fc.in_features
+        # New Model is trained with 224x224 images
+        # Calculation:
+        model.fc = nn.Linear(num_ftrs, args.num_classes, bias=True)
+        print(model)
+
+        params_to_update = model.parameters()
+        print("Params to learn:")
+        params_to_update = []
+        for name, param in model.named_parameters():
+            if param.requires_grad == True:
+                params_to_update.append(param)
+                print("\t", name)
+
+        if device.type == 'cuda':
+            print(torch.cuda.get_device_name(0))
+            print('Memory Usage:')
+            print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+            print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+            print(" ")
 
         fold_dataset_train = SplitDataset(X_train, y_train)
         fold_dataset_test = SplitDataset(X_test, y_test)
@@ -434,5 +435,10 @@ if __name__ == "__main__":
 
         # # Check Accuracy with Test Set
         check_accuracy(test_loader, model)
+
+        # Clear model and related resources
+        del model
+        torch.cuda.empty_cache()  # Clear GPU memory
+        gc.collect()  # Collect garbage
 
         fold_n += 1
