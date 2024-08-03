@@ -296,7 +296,7 @@ def check_accuracy(loader, model):
 
         print(f'Sensitivity (per class): {np.round(sensitivity, 4)}')
         print(f'Specificity (per class): {np.round(specificity, 4)}')
-        print(classification_report(test_ground_truths, test_pred_classes, target_names=target_names))
+        print(classification_report(test_ground_truths, test_pred_classes, target_names=target_names, digits=4))
 
         
 
