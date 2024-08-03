@@ -267,7 +267,7 @@ def check_accuracy(loader, model):
 
         print(f'Got {num_correct} / {num_samples} with accuracy {float(num_correct)/float(num_samples)*100:.2f}')
 
-        target_names = ['pick', 'stand', 'walk']
+        target_names = ['reach_out', 'stand', 'walk']
 
         # Generate confusion matrix for the predictions
         conf_matrix = confusion_matrix(test_ground_truths, test_pred_classes)
