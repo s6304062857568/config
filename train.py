@@ -339,7 +339,7 @@ if __name__ == "__main__":
 
     msss = MultilabelStratifiedShuffleSplit(n_splits=5, test_size=0.2, random_state=14)
 
-    fold_n = 5;
+    fold_n = 1;
     for train_index, test_index in msss.split(X, y):
         X_train = [X[index] for index in train_index]
         y_train = [y[index] for index in train_index]
