@@ -275,6 +275,16 @@ def check_accuracy(loader, model):
         plt.figure(figsize=(8,8))
         sns.set(font_scale = 1.5)
 
+        ax = sns.heatmap(
+            conf_matrix, annot=True, fmt='d',
+            cbar=False, cmap='tab10', vmax=500,
+            xticklabels=target_names, yticklabels=target_names
+        )
+
+        ax.set_xlabel("Predicted", labelpad=20)
+        ax.set_ylabel("Actual", labelpad=20)
+        plt.show()
+
         test_accuracy, test_f1, test_precision, test_recall = get_acc_f1_precision_recall(
                 test_pred_classes, test_ground_truths
             )
