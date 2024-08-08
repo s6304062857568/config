@@ -255,7 +255,7 @@ def check_accuracy(loader, model):
             test_ground_truths.extend(torch.max(y, 1)[1].detach().cpu().numpy())
             
             scores = model(x)
-            print(scores)
+            #print(scores)
             predictions = scores.argmax (1)
             y = y.argmax (1)
 
@@ -373,15 +373,15 @@ if __name__ == "__main__":
         # New Model is trained with 224x224 images
         # Calculation:
         model.fc = nn.Linear(num_ftrs, args.num_classes, bias=True)
-        print(model)
+        #print(model)
 
         params_to_update = model.parameters()
-        print("Params to learn:")
+        #print("Params to learn:")
         params_to_update = []
         for name, param in model.named_parameters():
             if param.requires_grad == True:
                 params_to_update.append(param)
-                print("\t", name)
+                #print("\t", name)
 
         if device.type == 'cuda':
             print(torch.cuda.get_device_name(0))
