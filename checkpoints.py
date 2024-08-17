@@ -37,10 +37,10 @@ def save_weights(model, args, epoch, fold, optimizer):
     if not os.path.exists(args.model_path):
         os.mkdir(args.model_path)
 
-    model_name = '{}_{}_{}_{}'.format(args.base_model_name, fold, epoch, args.lr)
+    model_name = '{}_fold{}_{}_{}'.format(args.base_model_name, fold, epoch, args.lr)
     torch.save(state, '{}/{}.pt'.format(args.model_path, model_name))
     
-    file_size = os.path.getsize(model_name)
+    file_size = os.path.getsize('{}/{}.pt'.format(args.model_path, model_name))
     print('file_size:', file_size)
     print(f"Model file size: {file_size / (1024 ** 2)} MB")
 
