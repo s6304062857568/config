@@ -108,6 +108,89 @@ class CustomDataset(Dataset):
         assert len(video_frames) == 16
         return np.transpose(np.asarray(video_frames), (1,0,2,3))
 
+class CustomDatasetJSON(Dataset):
+    """CustomDataset: a Dataset for Human Action Recognition."""
+    def __init__(self, annotation, augmented, video_dir="/content/dataset_videos/examples/", augmented_dir="/content/dataset_videos/augmented-examples/", augment=None, transform=None, poseData=False):
+
+        self.video_list = list(annotation.items())
+
+        if augment == True:
+            self.augment = augment
+            augmented_list = list(augmented.items())
+            self.augmented_dir = augmented_dir
+            # extend with augmented data
+            self.video_list.extend(augmented_list)
+
+        self.video_dir = video_dir
+        self.poseData = poseData
+        self.transform = transform
+
+    def __len__(self):
+        # return length of none-flipped videos in directory
+        return len(self.video_list)
+
+    def __getitem__(self, idx):
+        video_id = self.video_list[idx][0]
+
+        encoding = np.squeeze(np.eye(3)[np.array([0,1,2]).reshape(-1)])
+        if self.poseData and self.augment==False:
+            joints = np.load(self.video_dir + video_id + ".npy", allow_pickle=True)
+            sample = {'video_id': video_id, 'joints': joints, 'action': torch.from_numpy(np.array(encoding[self.video_list[idx][1]])), 'class': self.video_list[idx][1]}
+        else:
+            video = self.VideoToNumpy(video_id)
+            sample = {'video_id': video_id, 'video': torch.from_numpy(video).float(), 'action': torch.from_numpy(np.array(encoding[int(self.video_list[idx][1])])), 'class': int(self.video_list[idx][1])}
+
+        return sample
+
+    def keystoint(self, x):
+        return {int(k): v for k, v in x.items()}
+
+    def VideoToNumpy(self, video_id):
+        # get video
+        video = cv2.VideoCapture(self.video_dir + video_id + ".mp4")
+        video_frames_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        #if video_frames_count > 16:
+        #    print(f'video_id: {video_id} has over frame size({video_frames_count})')
+
+        if not video.isOpened():
+            video = cv2.VideoCapture(self.augmented_dir + video_id + ".mp4")
+        if not video.isOpened():
+            raise Exception("Video file not readable")
+
+        video_frames = []
+        max_frames = 16
+        frame_count = 0
+
+        if video_frames_count > max_frames:
+          skip_frames_window = max(int(video_frames_count/max_frames),1) #default skip is 1
+          for frame_counter in range(max_frames):
+            video.set(cv2.CAP_PROP_POS_FRAMES,frame_counter*skip_frames_window)
+            success,frame = video.read()
+            if not success:
+              break
+
+            frame = np.asarray([frame[..., i] for i in range(frame.shape[-1])]).astype(float)
+            video_frames.append(frame)
+        else:
+          while (video.isOpened()):
+              # read video
+              success, frame = video.read()
+              if not success:
+                  break
+
+              frame = np.asarray([frame[..., i] for i in range(frame.shape[-1])]).astype(float)
+              video_frames.append(frame)
+
+              frame_count += 1
+
+              # Break the loop if the desired number of frames is reached
+              if frame_count == max_frames:
+                  break     
+
+        video.release()
+        assert len(video_frames) == 16
+        return np.transpose(np.asarray(video_frames), (1,0,2,3))
+
 def VideoToTensor(video_id, data_dir="/content/dataset_videos/examples/", output_dir="tensor-dataset/", max_len=None, fps=None, padding_mode=None):
     # open video file
     path = data_dir + video_id + ".mp4"
